@@ -116,7 +116,7 @@ impl App {
                     Some(_) => LETTER_BG2,
                     None => LETTER_BG1,
                 };
-                let key_block = Block::bordered().style(Style::default().bg(bg));
+                let key_block = Block::bordered().style(Style::default().bg(bg)).fg(fg);
                 let inner = key_block.inner(key_rect);
                 key_block.render(key_rect, buf);
                 Paragraph::new(letter.to_ascii_uppercase().to_string())
