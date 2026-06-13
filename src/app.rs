@@ -86,6 +86,10 @@ impl App {
             &['a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l'],
             &['z', 'x', 'c', 'v', 'b', 'n', 'm'],
         ];
+        const GRAY: Color = Color::Rgb(69, 71, 90);
+        const LETTER_BG1: Color = Color::Rgb(205, 214, 244);
+        const LETTER_BG2: Color = Color::Rgb(17, 17, 17);
+
         let key_width: u16 = 5;
         let key_height: u16 = 3;
         let key_gap: u16 = 0;
@@ -105,11 +109,18 @@ impl App {
                     key_width,
                     key_height,
                 );
-                let bg = self.letter_colors[letter as usize - 'a' as usize].unwrap_or(Color::Reset);
+                let stored = self.letter_colors[letter as usize - 'a' as usize];
+                let bg = stored.unwrap_or(Color::Reset);
+                let fg = match stored {
+                    Some(c) if c == GRAY => LETTER_BG1,
+                    Some(_) => LETTER_BG2,
+                    None => LETTER_BG1,
+                };
                 let key_block = Block::bordered().style(Style::default().bg(bg));
                 let inner = key_block.inner(key_rect);
                 key_block.render(key_rect, buf);
                 Paragraph::new(letter.to_ascii_uppercase().to_string())
+                    .style(Style::default().fg(fg))
                     .centered()
                     .bold()
                     .render(inner, buf);
@@ -167,6 +178,10 @@ impl App {
     }
 
     fn handle_key_event(&mut self, key_event: KeyEvent) {
+        const GREEN: Color = Color::Rgb(166, 227, 161);
+        const YELLOW: Color = Color::Rgb(249, 226, 175);
+        const GRAY: Color = Color::Rgb(69, 71, 90);
+        
         if self.game_state != GameState::InProgress {
             match key_event.code {
                 KeyCode::Char('y') | KeyCode::Char('Y') => self.reset_game(),
@@ -203,14 +218,14 @@ impl App {
                         let mut matched = false;
                         if !contains_chars[i] && c == self.answer_word[i]{
                             self.grid.populate_cell(self.current_row, i, Some(c), Some(crate::grid::Color::Green));
-                            self.update_letter_color(c, Color::Green);
+                            self.update_letter_color(c, GREEN);
                             contains_chars[i] = true;
                             matched = true;
                         } else {
                             for j in 0..5 {
                                 if !contains_chars[j] && c == self.answer_word[j] && i != j{
                                     self.grid.populate_cell(self.current_row, i, Some(c), Some(crate::grid::Color::Yellow));
-                                    self.update_letter_color(c, Color::Yellow);
+                                    self.update_letter_color(c, YELLOW);
                                     contains_chars[j] = true;
                                     matched = true;
                                     break;
@@ -219,7 +234,7 @@ impl App {
                         }
                         if !matched {
                             self.grid.populate_cell(self.current_row, i, Some(c), Some(crate::grid::Color::Gray));
-                            self.update_letter_color(c, Color::DarkGray);
+                            self.update_letter_color(c, GRAY);
                         }
                     }
                     let is_won = self.grid.cells[self.current_row * self.grid.cols..(self.current_row + 1) * self.grid.cols]
@@ -255,10 +270,17 @@ impl App {
 
 impl Widget for &App {
     fn render(self, area: Rect, buf: &mut Buffer) {
+        const BG_COLOR: Color = Color::Rgb(30, 30, 46);
+        const GREEN: Color = Color::Rgb(166, 227, 161);
+        const YELLOW: Color = Color::Rgb(249, 226, 175);
+        const GRAY: Color = Color::Rgb(69, 71, 90);
+        const LETTER_BG1: Color = Color::Rgb(205, 214, 244);
+        const LETTER_BG2: Color = Color::Rgb(17, 17, 17);
+        
         let title = Line::from(" Wordle ").bold();
         let block = Block::bordered()
             .title(title.centered())
-            .border_set(border::DOUBLE);
+            .border_set(border::DOUBLE).bg(BG_COLOR);
         let inner_area = block.inner(area);
         block.render(area, buf);
 
@@ -300,9 +322,9 @@ impl Widget for &App {
                 );
 
                 let bg = match &cell.color {
-                    Some(crate::grid::Color::Gray) => Color::DarkGray,
-                    Some(crate::grid::Color::Yellow) => Color::Yellow,
-                    Some(crate::grid::Color::Green) => Color::Green,
+                    Some(crate::grid::Color::Gray) => GRAY,
+                    Some(crate::grid::Color::Yellow) => YELLOW,
+                    Some(crate::grid::Color::Green) => GREEN,
                     None => Color::Reset,
                 };
 
@@ -312,10 +334,10 @@ impl Widget for &App {
                 Paragraph::new(letter)
                     .block(
                         match &cell.color {
-                            Some(crate::grid::Color::Gray) => Block::new().padding(Padding::new(0, 0, top_pad + 1, 0)),
-                            Some(crate::grid::Color::Yellow) => Block::new().padding(Padding::new(0, 0, top_pad + 1, 0)),
-                            Some(crate::grid::Color::Green) => Block::new().padding(Padding::new(0, 0, top_pad + 1, 0)),
-                            None => Block::bordered().border_set(border::THICK).padding(Padding::new(0, 0, top_pad, 0)),
+                            Some(crate::grid::Color::Gray) => Block::new().padding(Padding::new(0, 0, top_pad + 1, 0)).fg(LETTER_BG1),
+                            Some(crate::grid::Color::Yellow) => Block::new().padding(Padding::new(0, 0, top_pad + 1, 0)).fg(LETTER_BG2),
+                            Some(crate::grid::Color::Green) => Block::new().padding(Padding::new(0, 0, top_pad + 1, 0)).fg(LETTER_BG2),
+                            None => Block::bordered().border_set(border::THICK).padding(Padding::new(0, 0, top_pad, 0)).fg(LETTER_BG1),
                         }
                     )
                     .style(Style::default().bg(bg))
