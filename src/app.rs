@@ -86,6 +86,7 @@ impl App {
             &['a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l'],
             &['z', 'x', 'c', 'v', 'b', 'n', 'm'],
         ];
+        const BG_COLOR: Color = Color::Rgb(30, 30, 46);
         const GRAY: Color = Color::Rgb(69, 71, 90);
         const LETTER_BG1: Color = Color::Rgb(205, 214, 244);
         const LETTER_BG2: Color = Color::Rgb(17, 17, 17);
@@ -110,7 +111,7 @@ impl App {
                     key_height,
                 );
                 let stored = self.letter_colors[letter as usize - 'a' as usize];
-                let bg = stored.unwrap_or(Color::Reset);
+                let bg = stored.unwrap_or(BG_COLOR);
                 let fg = match stored {
                     Some(c) if c == GRAY => LETTER_BG1,
                     Some(_) => LETTER_BG2,
@@ -178,6 +179,7 @@ impl App {
     }
 
     fn handle_key_event(&mut self, key_event: KeyEvent) {
+        
         const GREEN: Color = Color::Rgb(166, 227, 161);
         const YELLOW: Color = Color::Rgb(249, 226, 175);
         const GRAY: Color = Color::Rgb(69, 71, 90);
@@ -325,7 +327,7 @@ impl Widget for &App {
                     Some(crate::grid::Color::Gray) => GRAY,
                     Some(crate::grid::Color::Yellow) => YELLOW,
                     Some(crate::grid::Color::Green) => GREEN,
-                    None => Color::Reset,
+                    None => BG_COLOR,
                 };
 
                 let top_pad = (cell_height - 3) / 2;
