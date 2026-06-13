@@ -25,6 +25,7 @@ pub struct App {
     exit: bool,
     answer_word_picker: AnswerWordPicker,
     game_state: GameState,
+    letter_colors: [Option<Color>; 26],
 }
 
 #[derive(PartialEq)]
@@ -59,6 +60,7 @@ impl App {
             exit: false,
             answer_word_picker,
             game_state: GameState::InProgress,
+            letter_colors: [None; 26],
         }
     }
 
@@ -78,9 +80,55 @@ impl App {
         }
     }
     
+    fn draw_keyboard(&self, area: Rect, buf: &mut Buffer) {
+        const KEY_ROWS: [&[char]; 3] = [
+            &['q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p'],
+            &['a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l'],
+            &['z', 'x', 'c', 'v', 'b', 'n', 'm'],
+        ];
+        let key_width: u16 = 5;
+        let key_height: u16 = 3;
+        let key_gap: u16 = 0;
+        let keyboard_height = key_height * 3 + key_gap * 2;
+
+        let keyboard_start_y = area.y + area.height.saturating_sub(keyboard_height) / 2;
+
+        for (row_idx, row) in KEY_ROWS.iter().enumerate() {
+            let row_width = key_width * row.len() as u16 + key_gap * (row.len() as u16 - 1);
+            let row_x = area.x + area.width.saturating_sub(row_width) / 2;
+            let row_y = keyboard_start_y + row_idx as u16 * (key_height + key_gap);
+
+            for (col_idx, &letter) in row.iter().enumerate() {
+                let key_rect = Rect::new(
+                    row_x + col_idx as u16 * (key_width + key_gap),
+                    row_y,
+                    key_width,
+                    key_height,
+                );
+                let bg = self.letter_colors[letter as usize - 'a' as usize].unwrap_or(Color::Reset);
+                let key_block = Block::bordered().style(Style::default().bg(bg));
+                let inner = key_block.inner(key_rect);
+                key_block.render(key_rect, buf);
+                Paragraph::new(letter.to_ascii_uppercase().to_string())
+                    .centered()
+                    .bold()
+                    .render(inner, buf);
+            }
+        }
+    }
+
+    fn update_letter_color(&mut self, c: char, color: Color) {
+        let idx = c as usize - 'a' as usize;
+        match self.letter_colors[idx] {
+            Some(Color::Green) => {}
+            Some(Color::Yellow) if color == Color::DarkGray => {}
+            _ => self.letter_colors[idx] = Some(color),
+        }
+    }
+    
     fn render_game_over(&self, area: Rect, buf: &mut Buffer) {
-        let popup_width = 30;
-        let popup_height = 5;
+        let popup_width = 50;
+        let popup_height = 7;
         
         let popup_area = Rect::new(
             area.x + area.width.saturating_sub(popup_width) / 2,
@@ -92,12 +140,12 @@ impl App {
         Clear.render(popup_area, buf);
 
         let message = if self.game_state == GameState::Won {
-            "You Win! Yay!!!\nPlay again? (y/n)"
+            format!("You Won! Yay!!!\nPlay again? (y/n)")
         } else {
-            "Game Over! :(\nPlay again? (y/n)"
+            format!("Game Over! You Lose :(\nThe answer was {}\nPlay again? (y/n)", self.answer_word.iter().collect::<String>().to_ascii_uppercase())
         };
 
-        let popup_block = Block::bordered()
+        let popup_block = Block::bordered().padding(Padding { left: (0), right: (0), top: (1), bottom: (0) })
             .title(Line::from(" Game Over ").bold().centered())
             .border_set(border::THICK)
             .style(Style::default());
@@ -107,6 +155,7 @@ impl App {
             .centered()
             .render(popup_area, buf);
     }
+    
     fn handle_events(&mut self) -> io::Result<()> {
         match event::read()? {
             Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
@@ -154,12 +203,14 @@ impl App {
                         let mut matched = false;
                         if !contains_chars[i] && c == self.answer_word[i]{
                             self.grid.populate_cell(self.current_row, i, Some(c), Some(crate::grid::Color::Green));
+                            self.update_letter_color(c, Color::Green);
                             contains_chars[i] = true;
                             matched = true;
                         } else {
                             for j in 0..5 {
                                 if !contains_chars[j] && c == self.answer_word[j] && i != j{
                                     self.grid.populate_cell(self.current_row, i, Some(c), Some(crate::grid::Color::Yellow));
+                                    self.update_letter_color(c, Color::Yellow);
                                     contains_chars[j] = true;
                                     matched = true;
                                     break;
@@ -168,6 +219,7 @@ impl App {
                         }
                         if !matched {
                             self.grid.populate_cell(self.current_row, i, Some(c), Some(crate::grid::Color::Gray));
+                            self.update_letter_color(c, Color::DarkGray);
                         }
                     }
                     let is_won = self.grid.cells[self.current_row * self.grid.cols..(self.current_row + 1) * self.grid.cols]
@@ -197,7 +249,7 @@ impl App {
         self.grid = Grid::new();
         self.current_row = 0;
         self.current_col = 0;
-        
+        self.letter_colors = [None; 26];
     }
 }
 
@@ -208,16 +260,17 @@ impl Widget for &App {
             .title(title.centered())
             .border_set(border::DOUBLE);
         let inner_area = block.inner(area);
-        block.render(inner_area, buf);
+        block.render(area, buf);
 
         let cell_width: u16 = 5;
         let cell_height: u16 = 3;
         let gap: u16 = 1;
         let grid_width = cell_width * 5 + gap * 4;
         let grid_height = cell_height * 6 + gap * 5;
+        let keyboard_section: u16 = 13;
 
-        let min_width = grid_width + 4; // 4 for outer border + padding
-        let min_height = grid_height + 4;
+        let min_width = grid_width + 4;
+        let min_height = grid_height + keyboard_section + 2;
 
         if area.width < min_width || area.height < min_height {
             Paragraph::new("Terminal too small!")
@@ -225,8 +278,15 @@ impl Widget for &App {
                 .render(area, buf);
             return;
         }
-        let start_x = inner_area.x + inner_area.width.saturating_sub(grid_width) / 2;
-        let start_y = inner_area.y + inner_area.height.saturating_sub(grid_height) / 2;
+
+        let grid_section_height = inner_area.height.saturating_sub(keyboard_section);
+        let grid_area = Rect::new(inner_area.x, inner_area.y, inner_area.width, grid_section_height);
+        let keyboard_area = Rect::new(inner_area.x, inner_area.y + grid_section_height, inner_area.width, keyboard_section);
+
+        self.draw_keyboard(keyboard_area, buf);
+
+        let start_x = grid_area.x + grid_area.width.saturating_sub(grid_width) / 2;
+        let start_y = grid_area.y + grid_area.height.saturating_sub(grid_height) / 2;
 
         for row in 0..self.grid.rows {
             for col in 0..self.grid.cols {
